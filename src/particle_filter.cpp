@@ -12,7 +12,6 @@
 #include <iostream>
 #include <iterator>
 #include <numeric>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -31,7 +30,6 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    *   (and others in this file).
    */
   num_particles = 5000;  // TODO: Set the number of particles
-  std::default_random_engine generator(0);
   std::normal_distribution<double> gaussian(0.0, 1.0);
   particles.clear();
   for (int i = 0; i < num_particles; ++i) {
@@ -53,7 +51,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
-    std::default_random_engine generator(0);
     std::normal_distribution<double> gaussian(0.0, 1.0);
     for (auto& p: particles) {
         p.x += std_pos[0] * gaussian(generator) +
@@ -154,7 +151,6 @@ void ParticleFilter::resample() {
         particle.weight /= total_weight;
     }
     // Perform roulette resampling
-    std::default_random_engine generator(0);
     std::uniform_real_distribution<double> distribution(0, 1);
     double target_pos = distribution(generator);
     double current_pos = 0;
@@ -178,6 +174,7 @@ void ParticleFilter::resample() {
     std::vector<Particle> new_particles;
     for (auto& resampled_index: indices) {
         new_particles.push_back(particles[resampled_index]);
+        new_particles.back().weight = 1.0/particles.size();
     }
     particles = new_particles;
 }

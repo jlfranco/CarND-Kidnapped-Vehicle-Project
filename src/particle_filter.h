@@ -9,6 +9,7 @@
 #ifndef PARTICLE_FILTER_H_
 #define PARTICLE_FILTER_H_
 
+#include <random>
 #include <string>
 #include <vector>
 #include "helper_functions.h"
@@ -105,6 +106,9 @@ class ParticleFilter {
  private:
   // Number of particles to draw
   int num_particles; 
+  
+  // Random number generator
+  std::default_random_engine generator;
   
   // Flag, if filter is initialized
   bool is_initialized;
