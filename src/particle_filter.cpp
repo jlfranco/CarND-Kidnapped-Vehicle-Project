@@ -29,7 +29,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  num_particles = 5000;  // TODO: Set the number of particles
+  num_particles = 100;  // TODO: Set the number of particles
   std::normal_distribution<double> gaussian(0.0, 1.0);
   particles.clear();
   for (int i = 0; i < num_particles; ++i) {
@@ -52,12 +52,20 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
     std::normal_distribution<double> gaussian(0.0, 1.0);
-    for (auto& p: particles) {
-        p.x += std_pos[0] * gaussian(generator) +
-          (velocity/yaw_rate)*(sin(p.theta + delta_t*yaw_rate) - sin(p.theta));
-        p.y += std_pos[1] * gaussian(generator) +
-          (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + delta_t*yaw_rate));
-        p.theta += std_pos[2] * gaussian(generator) + delta_t * yaw_rate;
+    if (yaw_rate > 0.001 || yaw_rate < -0.001) {
+        for (auto& p: particles) {
+            p.x += std_pos[0] * gaussian(generator) +
+            (velocity/yaw_rate)*(sin(p.theta + delta_t*yaw_rate) - sin(p.theta));
+            p.y += std_pos[1] * gaussian(generator) +
+            (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + delta_t*yaw_rate));
+            p.theta += std_pos[2] * gaussian(generator) + delta_t * yaw_rate;
+        }
+    } else {
+        for (auto& p: particles) {
+            p.x += std_pos[0]*gaussian(generator) + delta_t*velocity*cos(p.theta);
+            p.y += std_pos[1]*gaussian(generator) + delta_t*velocity*sin(p.theta);
+            p.theta += std_pos[2]*gaussian(generator);
+        }
     }
 }
 
@@ -116,13 +124,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
                     best_landmark = l_i;
                 }
             }
-            particle.associations.back() = best_landmark;
+            // To deal with 1 based indexing
+            particle.associations.back() = best_landmark + 1;
         }
         // Update weight
         for (unsigned int obs_i = 0; obs_i < particle.associations.size();
                 ++obs_i) {
             int association = particle.associations[obs_i];
             if (association == -1) continue;
+            association -= 1;
             double l_x = map_landmarks.landmark_list[association].x_f;
             double l_y = map_landmarks.landmark_list[association].y_f;
             double likelihood = GaussianPDF2D(particle.sense_x[obs_i],
@@ -152,29 +162,28 @@ void ParticleFilter::resample() {
     }
     // Perform roulette resampling
     std::uniform_real_distribution<double> distribution(0, 1);
+    double increment = 1.0/particles.size();
     double target_pos = distribution(generator);
     double current_pos = 0;
-    int current_particle = 0;
-    double increment = 1.0/particles.size();
-    std::vector<int> indices;
+    unsigned int current_particle = 0;
+    std::vector<unsigned int> indices;
     for (unsigned int i = 0; i < particles.size(); ++i) {
-        while (current_pos < target_pos) {
-            if (current_pos > 1.0) {
-                current_pos -= 1.0;
-                current_particle = 0;
-            }
+        while (current_pos + particles[current_particle].weight < target_pos) {
             current_pos += particles[current_particle].weight;
-            current_particle += 1;
+            current_particle++;
+            if (current_particle >= particles.size()) {
+                current_particle = 0;
+                current_pos -= 1.0;
+                target_pos -= 1.0;
+            }
         }
         indices.push_back(current_particle);
         target_pos += increment;
-        if (target_pos >= 1.0)
-            target_pos -= 1.0;
     }
     std::vector<Particle> new_particles;
     for (auto& resampled_index: indices) {
         new_particles.push_back(particles[resampled_index]);
-        new_particles.back().weight = 1.0/particles.size();
+        new_particles.back().weight = 1.0;
     }
     particles = new_particles;
 }
